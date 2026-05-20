@@ -1,40 +1,24 @@
 <!doctype html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Direccionamientos</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Consulta de Direccionamientos</title>
+  <link rel="stylesheet" href="/static/styles.css" />
 </head>
-
 <body>
   <header>
     <h1>Consulta de Direccionamientos</h1>
-    <p>Snapshot actual por carga diaria. Consulta por ID Ciclo Dispensación o Identificación del Paciente.</p>
+    <p>Consulta pública por ID Ciclo Dispensación o Identificación del Paciente.</p>
   </header>
 
   <main>
     <div class="grid">
       <aside>
         <section class="card">
-          <h2>1. Cargar archivo diario</h2>
-          <p class="muted">El archivo nuevo reemplaza completamente la foto actual de la base de datos.</p>
-          <form id="uploadForm">
-            <label for="fileInput">Archivo Excel o CSV</label>
-            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" required />
-            <div class="space"></div>
-            <button type="submit">Cargar archivo</button>
-          </form>
-          <div id="uploadStatus" class="status hidden"></div>
-        </section>
-
-        <div class="space"></div>
-
-        <section class="card">
-          <h2>2. Buscar registros</h2>
+          <h2>Buscar registros</h2>
           <label for="searchInput">Cédula o ID Ciclo</label>
-          <input id="searchInput" type="text" placeholder="Ej: 1068417032 o 12345..." />
+          <input id="searchInput" type="text" placeholder="Ej: 1068417032 o CICLO-001" />
           <div class="space"></div>
           <div class="row">
             <select id="searchType">
@@ -45,14 +29,6 @@
             <button id="searchBtn" type="button">Buscar</button>
           </div>
           <div id="searchStatus" class="status hidden"></div>
-        </section>
-
-        <div class="space"></div>
-
-        <section class="card">
-          <h2>Últimas cargas</h2>
-          <button class="secondary" id="refreshImports" type="button">Actualizar historial</button>
-          <div id="importsList" class="status">Sin consultar.</div>
         </section>
       </aside>
 
@@ -120,7 +96,7 @@
       </section>
     </div>
   </main>
-  <script src="index.js"></script>
-</body>
 
+  <script src="/static/index.js"></script>
+</body>
 </html>

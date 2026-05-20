@@ -1,5 +1,4 @@
 let lastQuery = null;
-let lastType = 'auto';
 let currentDocumento = null;
 let currentIdCiclo = null;
 
@@ -20,31 +19,6 @@ async function parseResponse(response) {
     try { return JSON.parse(text); } catch { return { detail: text || response.statusText }; }
 }
 
-$('uploadForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const file = $('fileInput').files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    showStatus($('uploadStatus'), 'Procesando archivo. No cierres esta pestaña...', 'warn');
-
-    try {
-        const response = await fetch('/api/imports/upload', { method: 'POST', body: formData });
-        const data = await parseResponse(response);
-        if (!response.ok) throw new Error(data.detail || 'Error cargando archivo');
-
-        showStatus(
-            $('uploadStatus'),
-            `Carga ${data.estado}\nBatch: ${data.id}\nFilas archivo: ${data.total_filas}\nInsertadas: ${data.filas_insertadas}\nRechazadas: ${data.filas_rechazadas}`,
-            data.filas_rechazadas > 0 ? 'warn' : 'ok'
-        );
-        loadImports();
-    } catch (err) {
-        showStatus($('uploadStatus'), err.message, 'error');
-    }
-});
-
 $('searchBtn').addEventListener('click', searchRecords);
 $('searchInput').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') searchRecords();
@@ -62,7 +36,6 @@ async function searchRecords() {
     }
 
     lastQuery = query;
-    lastType = tipo;
     showStatus($('searchStatus'), 'Buscando...', 'warn');
 
     try {
@@ -150,26 +123,3 @@ $('saveCategory').addEventListener('click', async () => {
         showStatus($('searchStatus'), err.message, 'error');
     }
 });
-
-$('refreshImports').addEventListener('click', loadImports);
-
-async function loadImports() {
-    try {
-        const response = await fetch('/api/imports');
-        const data = await parseResponse(response);
-        if (!response.ok) throw new Error(data.detail || 'Error cargando historial');
-
-        if (!data.length) {
-            $('importsList').textContent = 'No hay cargas registradas.';
-            return;
-        }
-
-        $('importsList').innerHTML = data.slice(0, 8).map(item =>
-            `#${item.id} · ${item.estado}\n${item.filename}\nInsertadas: ${item.filas_insertadas} · Rechazadas: ${item.filas_rechazadas}\n${new Date(item.created_at).toLocaleString('es-CO')}`
-        ).join('\n\n');
-    } catch (err) {
-        showStatus($('importsList'), err.message, 'error');
-    }
-}
-
-loadImports();
