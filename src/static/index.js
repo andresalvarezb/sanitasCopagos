@@ -1,125 +1,293 @@
-let lastQuery = null;
-let currentDocumento = null;
-let currentIdCiclo = null;
+const $ = (id) => document.getElementById(id);
 
-const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 2 });
+const state = {
+  lastQuery: null,
+  currentDocumento: null,
+  currentIdCiclo: null,
+};
 
-function $(id) { return document.getElementById(id); }
-function safe(value) { return value === null || value === undefined || value === '' ? '-' : value; }
-function decimal(value) { return value === null || value === undefined || value === '' ? 0 : Number(value); }
-
-function showStatus(element, message, type = '') {
-    element.className = 'status ' + type;
-    element.textContent = message;
-    element.classList.remove('hidden');
-}
-
-async function parseResponse(response) {
-    const text = await response.text();
-    try { return JSON.parse(text); } catch { return { detail: text || response.statusText }; }
-}
-
-$('searchBtn').addEventListener('click', searchRecords);
-$('searchInput').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') searchRecords();
-});
-$('reloadSearch').addEventListener('click', () => {
-    if (lastQuery) searchRecords();
+const moneyFormatter = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  maximumFractionDigits: 2,
 });
 
-async function searchRecords() {
-    const query = $('searchInput').value.trim();
-    const tipo = $('searchType').value;
-    if (!query) {
-        showStatus($('searchStatus'), 'Escribe una cédula o un ID Ciclo.', 'error');
-        return;
-    }
+const elements = {
+  searchBtn: $('searchBtn'),
+  searchInput: $('searchInput'),
+  searchType: $('searchType'),
+  searchStatus: $('searchStatus'),
+  reloadSearch: $('reloadSearch'),
+  emptyState: $('emptyState'),
+  resultsArea: $('resultsArea'),
+  pDocumento: $('pDocumento'),
+  pTipoDoc: $('pTipoDoc'),
+  pNombre: $('pNombre'),
+  pEps: $('pEps'),
+  pMunicipio: $('pMunicipio'),
+  pDepartamento: $('pDepartamento'),
+  pCategoria: $('pCategoria'),
+  pTotal: $('pTotal'),
+  categorySelect: $('categorySelect'),
+  saveCategory: $('saveCategory'),
+  tRegistros: $('tRegistros'),
+  tValor: $('tValor'),
+  tCopago: $('tCopago'),
+  recordsBody: $('recordsBody'),
+};
 
-    lastQuery = query;
-    showStatus($('searchStatus'), 'Buscando...', 'warn');
+const safe = (value) => {
+  const normalizedValue = value ?? '';
+  return normalizedValue === '' ? '-' : normalizedValue;
+};
 
-    try {
-        const response = await fetch(`/api/registros?query=${encodeURIComponent(query)}&tipo=${encodeURIComponent(tipo)}`);
-        const data = await parseResponse(response);
-        if (!response.ok) throw new Error(data.detail || 'Error consultando registros');
+const toNumber = (value) => {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
+};
 
-        renderResults(data);
-        showStatus($('searchStatus'), `Consulta finalizada. Registros encontrados: ${data.total}`, data.total ? 'ok' : 'warn');
-    } catch (err) {
-        showStatus($('searchStatus'), err.message, 'error');
-    }
-}
+const formatMoney = (value) => moneyFormatter.format(toNumber(value));
 
-function renderResults(data) {
-    $('emptyState').classList.add('hidden');
-    $('resultsArea').classList.remove('hidden');
+const escapeHtml = (value) => {
+  const text = String(safe(value));
 
-    const p = data.paciente || {};
-    currentDocumento = p.identificacion_paciente || null;
-    currentIdCiclo = data.registros?.[0]?.id_ciclo_dispensacion || null;
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+};
 
-    $('pDocumento').textContent = safe(p.identificacion_paciente);
-    $('pTipoDoc').textContent = safe(p.tipo_doc_paciente);
-    $('pNombre').textContent = safe(p.nombre);
-    $('pEps').textContent = safe(p.eps);
-    $('pMunicipio').textContent = safe(p.municipio);
-    $('pDepartamento').textContent = safe(p.departamento);
-    $('pCategoria').textContent = safe(p.categoria_actual);
-    $('pTotal').textContent = data.total;
-    $('categorySelect').value = p.categoria_actual || '';
+const showStatus = (element, message, type = '') => {
+  if (!element) return;
 
-    $('tRegistros').textContent = data.total;
-    $('tValor').textContent = money.format(decimal(data.total_valor_direccionado));
-    $('tCopago').textContent = money.format(decimal(data.total_copago));
+  element.className = `status ${type}`.trim();
+  element.textContent = message;
+  element.classList.remove('hidden');
+};
 
-    const rows = data.registros.map(r => `
+const parseResponse = async (response) => {
+  const text = await response.text();
+
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      detail: text || response.statusText || 'Respuesta inválida del servidor',
+    };
+  }
+};
+
+const requestJson = async (url, options = {}) => {
+  const response = await fetch(url, options);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.detail ?? 'Error inesperado del servidor');
+  }
+
+  return data;
+};
+
+const buildSearchUrl = ({ query, tipo }) => {
+  const params = new URLSearchParams({
+    query,
+    tipo,
+  });
+
+  return `/api/registros?${params.toString()}`;
+};
+
+const setText = (element, value) => {
+  if (!element) return;
+  element.textContent = safe(value);
+};
+
+const renderPatientInfo = ({ paciente = {}, total = 0 }) => {
+  state.currentDocumento = paciente.identificacion_paciente ?? null;
+
+  setText(elements.pDocumento, paciente.identificacion_paciente);
+  setText(elements.pTipoDoc, paciente.tipo_doc_paciente);
+  setText(elements.pNombre, paciente.nombre);
+  setText(elements.pEps, paciente.eps);
+  setText(elements.pMunicipio, paciente.municipio);
+  setText(elements.pDepartamento, paciente.departamento);
+  setText(elements.pCategoria, paciente.categoria_actual);
+  setText(elements.pTotal, total);
+
+  if (elements.categorySelect) {
+    elements.categorySelect.value = paciente.categoria_actual ?? '';
+  }
+};
+
+const renderTotals = ({
+  total = 0,
+  total_valor_direccionado = 0,
+  total_copago = 0,
+}) => {
+  setText(elements.tRegistros, total);
+  setText(elements.tValor, formatMoney(total_valor_direccionado));
+  setText(elements.tCopago, formatMoney(total_copago));
+};
+
+const renderRecords = (records = []) => {
+  if (!elements.recordsBody) return;
+
+  if (!records.length) {
+    elements.recordsBody.innerHTML = '<tr><td colspan="13">Sin registros.</td></tr>';
+    return;
+  }
+
+  elements.recordsBody.innerHTML = records
+    .map(
+      (record) => `
         <tr>
-          <td><span class="pill">${safe(r.id_ciclo_dispensacion)}</span></td>
-          <td>${safe(r.numero_prescripcion)}</td>
-          <td>${safe(r.fecha_maxima_entrega)}</td>
-          <td>${safe(r.fecha_direccionamiento)}</td>
-          <td>${safe(r.codigo_tecnologia_direccionada)}</td>
-          <td>${safe(r.tecnologia_direccionada)}</td>
-          <td>${safe(r.cantidad_total_entregar)}</td>
-          <td>${safe(r.estado_paciente)}</td>
-          <td>${safe(r.estado_final)}</td>
-          <td>${safe(r.laboratorio)}</td>
-          <td>${money.format(decimal(r.valor_direccionado))}</td>
-          <td>${safe(r.categoria)}</td>
-          <td>${money.format(decimal(r.copago))}</td>
+          <td>
+            <span class="pill">
+              ${escapeHtml(record.id_ciclo_dispensacion)}
+            </span>
+          </td>
+          <td>${escapeHtml(record.numero_prescripcion)}</td>
+          <td>${escapeHtml(record.fecha_maxima_entrega)}</td>
+          <td>${escapeHtml(record.fecha_direccionamiento)}</td>
+          <td>${escapeHtml(record.codigo_tecnologia_direccionada)}</td>
+          <td>${escapeHtml(record.tecnologia_direccionada)}</td>
+          <td>${escapeHtml(record.cantidad_total_entregar)}</td>
+          <td>${escapeHtml(record.estado_paciente)}</td>
+          <td>${escapeHtml(record.estado_final)}</td>
+          <td>${escapeHtml(record.laboratorio)}</td>
+          <td>${escapeHtml(formatMoney(record.valor_direccionado))}</td>
+          <td>${escapeHtml(record.categoria)}</td>
+          <td>${escapeHtml(formatMoney(record.copago))}</td>
         </tr>
-      `).join('');
+      `
+    )
+    .join('');
+};
 
-    $('recordsBody').innerHTML = rows || '<tr><td colspan="13">Sin registros.</td></tr>';
-}
+const renderResults = (data = {}) => {
+  elements.emptyState?.classList.add('hidden');
+  elements.resultsArea?.classList.remove('hidden');
 
-$('saveCategory').addEventListener('click', async () => {
-    const categoria = $('categorySelect').value;
-    if (!categoria) {
-        showStatus($('searchStatus'), 'Selecciona una categoría.', 'error');
-        return;
+  const records = data.registros ?? [];
+
+  state.currentIdCiclo = records.at(0)?.id_ciclo_dispensacion ?? null;
+
+  renderPatientInfo(data);
+  renderTotals(data);
+  renderRecords(records);
+};
+
+const searchRecords = async () => {
+  const query = elements.searchInput?.value?.trim() ?? '';
+  const tipo = elements.searchType?.value ?? 'auto';
+
+  if (!query) {
+    showStatus(
+      elements.searchStatus,
+      'Escribe una cédula o un ID Ciclo.',
+      'error'
+    );
+    return;
+  }
+
+  state.lastQuery = query;
+
+  showStatus(elements.searchStatus, 'Buscando...', 'warn');
+
+  try {
+    const data = await requestJson(buildSearchUrl({ query, tipo }));
+
+    renderResults(data);
+
+    showStatus(
+      elements.searchStatus,
+      `Consulta finalizada. Registros encontrados: ${data.total ?? 0}`,
+      data.total ? 'ok' : 'warn'
+    );
+  } catch (error) {
+    showStatus(
+      elements.searchStatus,
+      error?.message ?? 'Error consultando registros',
+      'error'
+    );
+  }
+};
+
+const buildCategoryPayload = () => {
+  const categoria = elements.categorySelect?.value ?? '';
+
+  if (!categoria) {
+    throw new Error('Selecciona una categoría.');
+  }
+
+  if (state.currentDocumento) {
+    return {
+      categoria,
+      identificacion_paciente: state.currentDocumento,
+    };
+  }
+
+  if (state.currentIdCiclo) {
+    return {
+      categoria,
+      id_ciclo_dispensacion: state.currentIdCiclo,
+    };
+  }
+
+  throw new Error('No hay paciente o registro seleccionado.');
+};
+
+const saveCategory = async () => {
+  let payload;
+
+  try {
+    payload = buildCategoryPayload();
+  } catch (error) {
+    showStatus(elements.searchStatus, error.message, 'error');
+    return;
+  }
+
+  try {
+    const data = await requestJson('/api/registros/categoria', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    showStatus(
+      elements.searchStatus,
+      `Categoría guardada. Registros actualizados: ${data.actualizados ?? 0}. Porcentaje: ${data.porcentaje ?? 0}%`,
+      'ok'
+    );
+
+    if (state.lastQuery) {
+      await searchRecords();
     }
+  } catch (error) {
+    showStatus(
+      elements.searchStatus,
+      error?.message ?? 'Error actualizando categoría',
+      'error'
+    );
+  }
+};
 
-    const payload = { categoria };
-    if (currentDocumento) payload.identificacion_paciente = currentDocumento;
-    else if (currentIdCiclo) payload.id_ciclo_dispensacion = currentIdCiclo;
-    else {
-        showStatus($('searchStatus'), 'No hay paciente o registro seleccionado.', 'error');
-        return;
-    }
+elements.searchBtn?.addEventListener('click', searchRecords);
 
-    try {
-        const response = await fetch('/api/registros/categoria', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await parseResponse(response);
-        if (!response.ok) throw new Error(data.detail || 'Error actualizando categoría');
-
-        showStatus($('searchStatus'), `Categoría guardada. Registros actualizados: ${data.actualizados}. Porcentaje: ${data.porcentaje}%`, 'ok');
-        if (lastQuery) searchRecords();
-    } catch (err) {
-        showStatus($('searchStatus'), err.message, 'error');
-    }
+elements.searchInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    searchRecords();
+  }
 });
+
+elements.reloadSearch?.addEventListener('click', () => {
+  if (state.lastQuery) {
+    searchRecords();
+  }
+});
+
+elements.saveCategory?.addEventListener('click', saveCategory);
