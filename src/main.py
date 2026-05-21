@@ -5,6 +5,7 @@ from pathlib import Path
 from src.database.conection import get_db
 from sqlalchemy.orm import Session
 from src.schemas import ImportBatchOut
+from src.services.import_service import import_file
 
 app = FastAPI(
     title="Sanitas Copagos API",
