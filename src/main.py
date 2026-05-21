@@ -5,13 +5,26 @@ from pathlib import Path
 from src.database.conection import get_db, engine
 from src.database.models import Base, ImportBatch, RegistroActual, ImportErrorRow
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
-from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo, CategoriaUpdateIn, CategoriaUpdateOut, ImportErrorOut
+from sqlalchemy import select, or_, case, text
+from src.schemas import (
+    ImportBatchOut,
+    RegistrosSearchOut,
+    PacienteInfo,
+    CategoriaUpdateIn,
+    CategoriaUpdateOut,
+    ImportErrorOut,
+)
 from src.services.import_service import import_file
-from src.services.normalization import clean_document, clean_text, calculate_copago, CATEGORY_RATES
+from src.services.normalization import (
+    clean_document,
+    clean_text,
+    calculate_copago,
+    CATEGORY_RATES,
+)
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from fastapi.middleware.cors import CORSMiddleware
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,11 +55,14 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def index():
     return FileResponse(STATIC_DIR / "index.html", media_type="text/html")
 
+
 @app.get("/admin")
 def admin():
     return FileResponse(STATIC_DIR / "admin.html", media_type="text/html")
 
+
 # * ADMIN VIEW API ENDPOINTS
+
 
 @app.get("/api/imports/{batch_id}/errors", response_model=list[ImportErrorOut])
 def list_import_errors(batch_id: int, db: Session = Depends(get_db)):
@@ -57,18 +73,22 @@ def list_import_errors(batch_id: int, db: Session = Depends(get_db)):
     )
     return list(db.scalars(stmt).all())
 
+
 # carga de archivos de datos al iniciar la aplicación
 @app.post("/api/imports/upload", response_model=ImportBatchOut)
 async def upload_import(file: UploadFile = File(...), db: Session = Depends(get_db)):
     return await import_file(db, file)
+
 
 @app.get("/api/imports", response_model=list[ImportBatchOut])
 def list_imports(db: Session = Depends(get_db)):
     stmt = select(ImportBatch).order_by(ImportBatch.created_at.desc()).limit(50)
     return db.scalars(stmt).all()
 
+
 # * INDEX VIEW API ENDPOINTS
 # Buscar dirreccionamientos por paciente
+
 
 def build_patient_info(records: list[RegistroActual]) -> PacienteInfo:
     if not records:
@@ -88,6 +108,7 @@ def build_patient_info(records: list[RegistroActual]) -> PacienteInfo:
         categoria_actual=categoria_actual,
     )
 
+
 @app.get("/api/registros", response_model=RegistrosSearchOut)
 def search_records(
     query: str = Query(..., min_length=1),
@@ -100,20 +121,42 @@ def search_records(
     if tipo == "documento":
         if not q_doc:
             raise HTTPException(status_code=400, detail="Documento inválido")
-        stmt = select(RegistroActual).where(RegistroActual.identificacion_paciente == q_doc)
+
+        stmt = select(RegistroActual).where(
+            RegistroActual.identificacion_paciente == q_doc
+        )
+
     elif tipo == "id_ciclo":
         if not q_text:
             raise HTTPException(status_code=400, detail="ID Ciclo inválido")
-        stmt = select(RegistroActual).where(RegistroActual.id_ciclo_dispensacion == q_text)
+
+        stmt = select(RegistroActual).where(
+            RegistroActual.id_ciclo_dispensacion == q_text
+        )
+
     else:
         conditions = []
+
         if q_doc:
             conditions.append(RegistroActual.identificacion_paciente == q_doc)
+
         if q_text:
             conditions.append(RegistroActual.id_ciclo_dispensacion == q_text)
-        stmt = select(RegistroActual).where(or_(*conditions)) if conditions else select(RegistroActual).where(False)
 
-    stmt = stmt.order_by(RegistroActual.fecha_direccionamiento.desc().nullslast(), RegistroActual.id.desc())
+        if not conditions:
+            stmt = select(RegistroActual).where(False)
+        else:
+            stmt = select(RegistroActual).where(or_(*conditions))
+
+    stmt = stmt.order_by(
+        case(
+            (RegistroActual.fecha_direccionamiento.is_(None), 1),
+            else_=0,
+        ),
+        RegistroActual.fecha_direccionamiento.desc(),
+        RegistroActual.id.desc(),
+    )
+
     records = list(db.scalars(stmt).all())
 
     total_valor = sum((r.valor_direccionado or Decimal("0")) for r in records)
@@ -129,6 +172,7 @@ def search_records(
         registros=records,
     )
 
+
 @app.put("/api/registros/categoria", response_model=CategoriaUpdateOut)
 def update_categoria(payload: CategoriaUpdateIn, db: Session = Depends(get_db)):
     categoria = payload.categoria.upper()
@@ -139,12 +183,16 @@ def update_categoria(payload: CategoriaUpdateIn, db: Session = Depends(get_db)):
     if payload.identificacion_paciente:
         documento = clean_document(payload.identificacion_paciente)
         if not documento:
-            raise HTTPException(status_code=400, detail="Identificación del Paciente inválida")
+            raise HTTPException(
+                status_code=400, detail="Identificación del Paciente inválida"
+            )
         stmt = stmt.where(RegistroActual.identificacion_paciente == documento)
     elif payload.id_ciclo_dispensacion:
         id_ciclo = clean_text(payload.id_ciclo_dispensacion, upper=True)
         if not id_ciclo:
-            raise HTTPException(status_code=400, detail="ID Ciclo Dispensación inválido")
+            raise HTTPException(
+                status_code=400, detail="ID Ciclo Dispensación inválido"
+            )
         stmt = stmt.where(RegistroActual.id_ciclo_dispensacion == id_ciclo)
     else:
         raise HTTPException(
@@ -154,7 +202,9 @@ def update_categoria(payload: CategoriaUpdateIn, db: Session = Depends(get_db)):
 
     records = list(db.scalars(stmt).all())
     if not records:
-        raise HTTPException(status_code=404, detail="No se encontraron registros para actualizar")
+        raise HTTPException(
+            status_code=404, detail="No se encontraron registros para actualizar"
+        )
 
     for record in records:
         record.categoria = categoria
@@ -162,4 +212,21 @@ def update_categoria(payload: CategoriaUpdateIn, db: Session = Depends(get_db)):
 
     db.commit()
 
-    return CategoriaUpdateOut(actualizados=len(records), categoria=categoria, porcentaje=rate * Decimal("100"))
+    return CategoriaUpdateOut(
+        actualizados=len(records), categoria=categoria, porcentaje=rate * Decimal("100")
+    )
+
+
+@app.get("/api/health/db")
+def health_db(db: Session = Depends(get_db)):
+    result = db.execute(text("SELECT 1")).scalar()
+
+    total_registros = db.execute(
+        text("SELECT COUNT(*) FROM registros_actuales")
+    ).scalar()
+
+    return {
+        "database": "ok",
+        "select_1": result,
+        "total_registros": total_registros,
+    }
