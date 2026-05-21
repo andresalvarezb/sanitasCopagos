@@ -39,6 +39,10 @@ class ImportBatch(Base):
         back_populates="batch",
         cascade="all, delete-orphan",
     )
+    errors: Mapped[list["ImportErrorRow"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+    )
 
 
 class RegistroActual(Base):
@@ -102,3 +106,20 @@ class RegistroActual(Base):
             "fecha_direccionamiento",
         ),
     )
+
+
+class ImportErrorRow(Base):
+    __tablename__ = "import_errors"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    import_batch_id: Mapped[int] = mapped_column(
+        ForeignKey("import_batches.id"), nullable=False
+    )
+    row_number: Mapped[int] = mapped_column(nullable=False)
+    error: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    batch: Mapped["ImportBatch"] = relationship(back_populates="errors")
