@@ -6,7 +6,7 @@ from src.database.conection import get_db, engine
 from src.database.models import Base, ImportBatch, RegistroActual, ImportErrorRow
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
-from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo, CategoriaUpdateIn, CategoriaUpdateOut
+from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo, CategoriaUpdateIn, CategoriaUpdateOut, ImportErrorOut
 from src.services.import_service import import_file
 from src.services.normalization import clean_document, clean_text, calculate_copago, CATEGORY_RATES
 from contextlib import asynccontextmanager
