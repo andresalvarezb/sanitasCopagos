@@ -6,9 +6,9 @@ from src.database.conection import get_db, engine
 from src.database.models import Base, ImportBatch, RegistroActual
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
-from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo
+from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo, CategoriaUpdateIn, CategoriaUpdateOut
 from src.services.import_service import import_file
-from src.services.normalization import clean_document, clean_text
+from src.services.normalization import clean_document, clean_text, calculate_copago, CATEGORY_RATES
 from contextlib import asynccontextmanager
 from decimal import Decimal
 
@@ -110,3 +110,38 @@ def search_records(
         paciente=build_patient_info(records),
         registros=records,
     )
+
+@app.put("/api/registros/categoria", response_model=CategoriaUpdateOut)
+def update_categoria(payload: CategoriaUpdateIn, db: Session = Depends(get_db)):
+    categoria = payload.categoria.upper()
+    rate = CATEGORY_RATES[categoria]
+
+    stmt = select(RegistroActual)
+
+    if payload.identificacion_paciente:
+        documento = clean_document(payload.identificacion_paciente)
+        if not documento:
+            raise HTTPException(status_code=400, detail="Identificación del Paciente inválida")
+        stmt = stmt.where(RegistroActual.identificacion_paciente == documento)
+    elif payload.id_ciclo_dispensacion:
+        id_ciclo = clean_text(payload.id_ciclo_dispensacion, upper=True)
+        if not id_ciclo:
+            raise HTTPException(status_code=400, detail="ID Ciclo Dispensación inválido")
+        stmt = stmt.where(RegistroActual.id_ciclo_dispensacion == id_ciclo)
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Debes enviar identificacion_paciente o id_ciclo_dispensacion",
+        )
+
+    records = list(db.scalars(stmt).all())
+    if not records:
+        raise HTTPException(status_code=404, detail="No se encontraron registros para actualizar")
+
+    for record in records:
+        record.categoria = categoria
+        record.copago = calculate_copago(record.valor_direccionado, categoria)
+
+    db.commit()
+
+    return CategoriaUpdateOut(actualizados=len(records), categoria=categoria, porcentaje=rate * Decimal("100"))

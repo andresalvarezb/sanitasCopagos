@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ImportBatchOut(BaseModel):
@@ -56,3 +56,15 @@ class RegistrosSearchOut(BaseModel):
     total_copago: Decimal
     paciente: PacienteInfo
     registros: list[RegistroOut]
+
+
+class CategoriaUpdateIn(BaseModel):
+    categoria: str = Field(pattern="^[ABCZ]$")
+    identificacion_paciente: str | None = None
+    id_ciclo_dispensacion: str | None = None
+
+
+class CategoriaUpdateOut(BaseModel):
+    actualizados: int
+    categoria: str
+    porcentaje: Decimal
