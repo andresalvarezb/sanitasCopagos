@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from src.database.conection import get_db, engine
-from src.database.models import Base, ImportBatch, RegistroActual
+from src.database.models import Base, ImportBatch, RegistroActual, ImportErrorRow
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
 from src.schemas import ImportBatchOut, RegistrosSearchOut, PacienteInfo, CategoriaUpdateIn, CategoriaUpdateOut
@@ -11,6 +11,7 @@ from src.services.import_service import import_file
 from src.services.normalization import clean_document, clean_text, calculate_copago, CATEGORY_RATES
 from contextlib import asynccontextmanager
 from decimal import Decimal
+from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +24,14 @@ app = FastAPI(
     version="1.0.0",
     description="API para gestionar los copagos de Sanitas",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -38,6 +47,15 @@ def admin():
     return FileResponse(STATIC_DIR / "admin.html", media_type="text/html")
 
 # * ADMIN VIEW API ENDPOINTS
+
+@app.get("/api/imports/{batch_id}/errors", response_model=list[ImportErrorOut])
+def list_import_errors(batch_id: int, db: Session = Depends(get_db)):
+    stmt = (
+        select(ImportErrorRow)
+        .where(ImportErrorRow.import_batch_id == batch_id)
+        .order_by(ImportErrorRow.row_number.asc())
+    )
+    return list(db.scalars(stmt).all())
 
 # carga de archivos de datos al iniciar la aplicación
 @app.post("/api/imports/upload", response_model=ImportBatchOut)

@@ -68,3 +68,13 @@ class CategoriaUpdateOut(BaseModel):
     actualizados: int
     categoria: str
     porcentaje: Decimal
+
+
+class ImportErrorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    row_number: int
+    error: str
+    raw_json: str | None
+    created_at: datetime
