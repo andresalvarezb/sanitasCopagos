@@ -4,8 +4,10 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from src.database.conection import get_db
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from src.schemas import ImportBatchOut
 from src.services.import_service import import_file
+from src.database.models import ImportBatch
 
 app = FastAPI(
     title="Sanitas Copagos API",
@@ -29,3 +31,8 @@ def admin():
 @app.post("/api/imports/upload", response_model=ImportBatchOut)
 async def upload_import(file: UploadFile = File(...), db: Session = Depends(get_db)):
     return await import_file(db, file)
+
+@app.get("/api/imports", response_model=list[ImportBatchOut])
+def list_imports(db: Session = Depends(get_db)):
+    stmt = select(ImportBatch).order_by(ImportBatch.created_at.desc()).limit(50)
+    return list(db.scalars(stmt).all())
