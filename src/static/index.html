@@ -13,27 +13,23 @@
   </header>
 
   <main>
-    <div class="grid">
-      <aside>
-        <section class="card">
-          <h2>Buscar registros</h2>
-          <label for="searchInput">Cédula o ID Ciclo</label>
-          <input id="searchInput" type="text" placeholder="Ej: 1068417032 o CICLO-001" />
-          <div class="space"></div>
-          <div class="row">
-            <select id="searchType">
-              <option value="auto">Auto</option>
-              <option value="documento">Identificación Paciente</option>
-              <option value="id_ciclo">ID Ciclo Dispensación</option>
-            </select>
-            <button id="searchBtn" type="button">Buscar</button>
-          </div>
-          <div id="searchStatus" class="status hidden"></div>
-        </section>
-      </aside>
+    <section class="card search-card">
+      <h2>Buscar registros</h2>
+      <label for="searchInput">Cédula o ID Ciclo</label>
+      <div class="search-fields">
+        <input id="searchInput" type="text" placeholder="Ej: 1068417032 o CICLO-001" />
+        <select id="searchType">
+          <option value="auto">Auto</option>
+          <option value="documento">Identificación Paciente</option>
+          <option value="id_ciclo">ID Ciclo Dispensación</option>
+        </select>
+        <button id="searchBtn" type="button">Buscar</button>
+      </div>
+      <div id="searchStatus" class="status hidden"></div>
+    </section>
 
-      <section class="card">
-        <h2>Información del paciente</h2>
+    <section class="card">
+      <h2>Información del paciente</h2>
         <div id="emptyState" class="status">Realiza una búsqueda para ver la información.</div>
 
         <div id="resultsArea" class="hidden">
@@ -48,53 +44,52 @@
             <div class="field"><span>Registros encontrados</span><strong id="pTotal">0</strong></div>
           </div>
 
-          <div class="category-line">
-            <div>
-              <label for="categorySelect">Categoría del paciente</label>
-              <select id="categorySelect">
-                <option value="">Seleccione...</option>
-                <option value="A">A - 11.5%</option>
-                <option value="B">B - 17.30%</option>
-                <option value="C">C - 23%</option>
-                <option value="Z">Z - 10%</option>
-              </select>
-            </div>
-            <button id="saveCategory" type="button">Guardar categoría</button>
-            <button id="reloadSearch" class="secondary" type="button">Reconsultar</button>
+        <div class="category-line">
+          <div>
+            <label for="categorySelect">Categoría del paciente</label>
+            <select id="categorySelect">
+              <option value="">Seleccione...</option>
+              <option value="A">A - 11.5%</option>
+              <option value="B">B - 17.30%</option>
+              <option value="C">C - 23%</option>
+              <option value="Z">Z - 10%</option>
+            </select>
           </div>
-
-          <div class="totals">
-            <div class="total-box"><span>Total registros</span><strong id="tRegistros">0</strong></div>
-            <div class="total-box"><span>Total valor direccionado</span><strong id="tValor">$0</strong></div>
-            <div class="total-box"><span>Total copago</span><strong id="tCopago">$0</strong></div>
-          </div>
-
-          <h2>Registros</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID Ciclo</th>
-                  <th>Prescripción</th>
-                  <th>Fecha Máxima</th>
-                  <th>Fecha Direcc.</th>
-                  <th>Código Tecnología</th>
-                  <th>Tecnología</th>
-                  <th>Cantidad</th>
-                  <th>Estado Paciente</th>
-                  <th>Estado Final</th>
-                  <th>Laboratorio</th>
-                  <th>Valor</th>
-                  <th>Categoría</th>
-                  <th>Copago</th>
-                </tr>
-              </thead>
-              <tbody id="recordsBody"></tbody>
-            </table>
-          </div>
+          <button id="saveCategory" type="button">Guardar categoría</button>
+          <button id="reloadSearch" class="secondary" type="button">Reconsultar</button>
         </div>
-      </section>
-    </div>
+
+        <h2>Registros</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID Ciclo</th>
+                <th>Prescripción</th>
+                <th>Fecha Máxima</th>
+                <th>Fecha Direcc.</th>
+                <th>Código Tecnología</th>
+                <th>Tecnología</th>
+                <th>Cantidad</th>
+                <th>Estado Paciente</th>
+                <th>Estado Final</th>
+                <th>Laboratorio</th>
+                <th>Valor</th>
+                <th>Categoría</th>
+                <th>Copago</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="totals">
+          <div class="total-box"><span>Total registros</span><strong id="tRegistros">0</strong></div>
+          <div class="total-box"><span>Total valor direccionado</span><strong id="tValor">$0</strong></div>
+          <div class="total-box"><span>Total copago</span><strong id="tCopago">$0</strong></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="/static/index.js"></script>
